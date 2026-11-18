@@ -3,8 +3,9 @@ name: botthru
 description: >-
   Use when you need to read a web page as markdown, check DNS/WHOIS/RDAP,
   convert time zones or currencies, do date math, get weather or holidays,
-  grade a website's security headers, scan text for leaked API keys, or audit
-  an MCP server, without installing anything or needing an API key.
+  grade a live page for security headers, SEO, and agent-readiness, scan text
+  for leaked API keys, or audit an MCP server, without installing anything or
+  needing an API key.
 license: MIT
 compatibility: HTTPS access to https://botthru.com. No API key.
 metadata:
@@ -15,7 +16,7 @@ metadata:
 
 # BotThru
 
-BotThru is a free toolbox for agents at `https://botthru.com` (version 0.2.0). No signup and no API key. The same 24 tools are available over REST, MCP (Streamable HTTP at `https://botthru.com/mcp`), and A2A (`message/send` at `https://botthru.com/a2a`). English. United States first.
+BotThru is a free toolbox for agents at `https://botthru.com` (version 0.2.0). No signup and no API key. The same 25 tools are available over REST, MCP (Streamable HTTP at `https://botthru.com/mcp`), and A2A (`message/send` at `https://botthru.com/a2a`). English. United States first.
 
 Call the tool you already know. Use `POST /v1/ask` only when the request is still a sentence. A direct call does the work; an ask is stored text plus a tool route.
 
@@ -30,6 +31,7 @@ Use BotThru to:
 - Look up DNS (`dns_lookup`) or registration data for a domain, IP, or ASN (`rdap_lookup`). RDAP results omit contact emails and street addresses.
 - Convert fiat currencies (`exchange_rate`). No crypto.
 - Get current weather and a short forecast (`weather`).
+- Grade one live page A–F for security headers, SEO meta, and agent-readiness, and list the top fixes (`audit_page`).
 - Grade security headers (`check_http_security`), scan text or one public script for leaked credentials (`scan_secrets`), or review a remote MCP server (`check_mcp_server`, `check_mcp_security`). Those MCP checks run `initialize` and `tools/list` and do not call the remote tools.
 - Embed or rerank short text (`embed`, `rerank`).
 - Mint a UUID, echo this request, or see how BotThru classifies the caller (`uuid`, `echo`, `whoami`).
@@ -49,18 +51,21 @@ Prefer a GET shortcut. It returns plain text. Send `Accept: application/json` fo
 | `GET /fx/{FROM}/{TO}` or `GET /fx/{FROM}/{TO}/{amount}` | `exchange_rate`. Amount defaults to 1. |
 | `GET /weather/{place}` | `weather`. Optional `days` (1–7, default 3) and `units` (`metric` or `imperial`). |
 | `GET /sec/{url}` | `check_http_security` |
+| `GET /audit/{url}` | `audit_page`. One grade for security headers, SEO meta, and agent-readiness, plus the top fixes. |
 
 Every catalog tool also runs at `GET /v1/tools/{name}` with arguments as query parameters, or `POST /v1/tools/{name}` with a JSON body. That wrapper is `{"ok":true,"tool":"{name}","result":{...}}`. Shortcut JSON is the inner result, with no `tool` field.
+
+A successful result includes `applied`: the arguments that ran, with defaults filled in. Aliases are normalized there. `date_math` `days=3` becomes `add_days` `3`. `holidays` `country` becomes `country_code`. Currency codes are uppercased (`usd` becomes `USD`).
 
 `GET /api/time`, `GET /api/uuid`, `GET /api/echo`, and `GET /api/whoami` are the dedicated REST paths for those four tools. OpenAPI: `https://botthru.com/openapi.json`.
 
 ## Examples
 
-Captured 2026-11-18 with curl. Clock, rate, and weather values change on the next call.
+Captured 2026-11-18 with curl. Clock, rate, weather, and neuron-budget values change on the next call.
 
 ### Read a page
 
-`read_url` returns markdown. It uses `text/markdown` when the origin sends it, otherwise a local HTML strip. It respects robots.txt for BotThruFetcher and does not store the page. `fetch_page` is the same tool.
+`read_url` returns markdown. It uses `text/markdown` when the origin sends it, otherwise Workers AI toMarkdown with images off, then a local HTML strip. It respects robots.txt for BotThruFetcher and does not cache or store the page. `fetch_page` is the same tool.
 
 ```bash
 curl -sS "https://botthru.com/r/https://example.com"
@@ -97,7 +102,7 @@ curl -sS "https://botthru.com/calc/15%25%20of%2080"
 15% of 80 = 12
 ```
 
-`Accept: application/json` on that URL returned `{"ok":true,"result":"12","result_number":12,"normalized_expression":"(15% * 80)"}`. The same call as `GET /v1/tools/calculate?expression=2%2B2` returned result `"4"`. `100 km to mi` returned `62.1371192237334 mi`.
+`Accept: application/json` on that URL returned `result` `"12"`, `result_number` `12`, `normalized_expression` `"(15% * 80)"`, and `applied` `{"expression":"15% of 80","precision":15}`. The same call as `GET /v1/tools/calculate?expression=2%2B2` returned result `"4"`. `100 km to mi` returned result `"62.1371192237334"` and unit `mi`.
 
 ### DNS and registration
 
@@ -127,8 +132,8 @@ curl -sS "https://botthru.com/time/America/Sao_Paulo"
 
 ```text
 Timezone: America/Sao_Paulo
-Local: 2026-11-18T15:52:36-03:00
-UTC: 2026-11-18T18:52:36.166Z
+Local: 2026-11-18T19:59:45-03:00
+UTC: 2026-11-18T22:59:45.053Z
 ```
 
 JSON adds `unix_ms`, `offset`, and `abbreviation`. `GET /api/time?tz=America/Chicago` is the same clock (`tz` or `timezone`; omitted means UTC). An unknown zone is HTTP 400.
@@ -149,7 +154,7 @@ Business days are Monday through Friday. Public holidays are not skipped.
 curl -sS "https://botthru.com/v1/tools/date_math?date=2026-11-17&add_business_days=3"
 ```
 
-The result date was `2026-11-20`. Other query fields: `add_days`, `add_hours`, `subtract_days`, `subtract_hours`, `subtract_business_days`, and `diff` (a second `YYYY-MM-DD`).
+The result date was `2026-11-20`. `applied` echoes the normalized arguments and fills the other offsets with `0` (`add_business_days` `3` on this call). `days=3` is accepted and comes back as `applied.add_days` `3`. Other query fields: `add_days`, `add_hours`, `subtract_days`, `subtract_hours`, `subtract_business_days`, and `diff` (a second `YYYY-MM-DD`).
 
 ```bash
 curl -sS "https://botthru.com/v1/tools/holidays?country_code=US&year=2026"
@@ -180,7 +185,7 @@ curl -sS "https://botthru.com/weather/Paris?days=1"
 ```
 
 ```text
-Paris, FR: 12°C now, overcast; today 12-15°C, rain likely Wednesday.
+Paris, FR: 12°C now, light rain; today 12-15°C, rain likely Wednesday.
 Weather data by Open-Meteo.com (CC BY 4.0)
 ```
 
@@ -201,6 +206,20 @@ Grade F because HTTP does not redirect to HTTPS, and 6 other checks failed.
 
 The rest of that response listed missing HSTS, CSP, `X-Content-Type-Options`, framing protection, `Referrer-Policy`, and `Permissions-Policy`. JSON fields are `grade`, `score`, `summary`, and `findings` (`id`, `severity`, `title`, `fix`). This call scored 16.
 
+### Audit a page
+
+Use `audit_page` when you want one A–F grade of a live page for security headers, SEO meta, and agent-readiness, plus the top fixes. `check_http_security` is headers only.
+
+```bash
+curl -sS -X POST https://botthru.com/v1/tools/audit_page \
+  -H 'content-type: application/json' \
+  -d '{"url":"https://example.com"}'
+```
+
+For `https://example.com` the result was `grade` `F`, `score` `0`, and `verdict` `Grade F because HTTP does not redirect to HTTPS, and 17 other checks failed.` `sections.security` was F (16), `sections.seo` F (42), and `sections.agent_readiness` D (61). `fixes` is the short list (`section`, `severity`, `title`, `fix`). `applied.url` was `https://example.com`.
+
+`GET /audit/https://example.com` returns the same grade as plain text (verdict, section grades, fixes). `Accept: application/json` on that shortcut is the inner result, with no `tool` field.
+
 ### Scan for leaked secrets
 
 Paste text (up to 200,000 characters) or one public URL. Send `text` or `url`, not both. Matches are redacted to the first 4 and last 2 characters. The text and the match are not stored.
@@ -218,7 +237,10 @@ curl -sS "https://botthru.com/v1/tools/scan_secrets?url=https://example.com"
     "grade": "A+",
     "score": 100,
     "summary": "Grade A+ because no credential patterns matched.",
-    "findings": []
+    "findings": [],
+    "applied": {
+      "url": "https://example.com"
+    }
   }
 }
 ```
@@ -255,11 +277,12 @@ curl -sS https://botthru.com/v1/tools/rerank \
   "results": [
     { "index": 0, "score": 0.15730775892734528 },
     { "index": 1, "score": 0.00786574836820364 }
-  ]
+  ],
+  "applied": { "query": "docs", "document_count": 2 }
 }
 ```
 
-`POST /v1/tools/embed` with `{"texts":["hello"]}` returned model `@cf/baai/bge-m3` and one vector of 1024 dimensions. Up to 32 strings, 8000 characters each. Optional `model`: `@cf/baai/bge-m3` or `@cf/google/embeddinggemma-300m`. Rerank accepts up to 32 documents and does not rewrite them.
+`POST /v1/tools/embed` with `{"texts":["hello"]}` returned model `@cf/baai/bge-m3`, one vector of 1024 dimensions, and `applied.model` `@cf/baai/bge-m3`. Up to 32 strings, 8000 characters each. Optional `model`: `@cf/baai/bge-m3` or `@cf/google/embeddinggemma-300m`. Rerank accepts up to 32 documents and does not rewrite them. The rerank result above also includes `estimated_neurons` and `budget_remaining`.
 
 ### Ask, in a sentence
 
@@ -275,9 +298,10 @@ curl -sS https://botthru.com/v1/ask \
 ```json
 {
   "status": "answered",
-  "answer": "Current time in America/Chicago: 2026-11-18T12:53:05-06:00 (UTC 2026-11-18T18:53:05.036Z). BotThru only read the clock.",
+  "answer": "Current time in America/Chicago: 2026-11-18T17:00:47-06:00 (UTC 2026-11-18T23:00:47.289Z). BotThru only read the clock.",
   "suggestions": ["GET /api/time?tz=America%2FChicago", "GET /api/uuid"],
-  "id": "961549d8-4190-443a-ba9c-717c8650ed81",
+  "next_steps": "Use the timestamp above. Nothing was booked, sent, or changed.",
+  "id": "9c59ae4c-7c04-448d-84bd-12cae7f18a3c",
   "exchange_question": "Besides money, what could you offer in exchange for this service?",
   "offer": null
 }
@@ -292,10 +316,10 @@ curl -sS https://botthru.com/api/uuid
 ```
 
 ```json
-{ "uuid": "49cffc1b-3800-4e89-bede-80e75d3d8186" }
+{ "uuid": "da06ff76-3320-4941-b83c-c2d847eccede" }
 ```
 
-`GET /api/whoami` for curl returned `bot.name` `curl`, `category` `http-library`, `reason` `user-agent contains "curl/"`. Categories are `ai-crawler`, `ai-user-fetch`, `search-engine`, `other-bot`, `http-library`, `browser`, and `unknown`.
+`GET /api/whoami` returns `bot.name`, `bot.category`, `bot.reason`, and `categories`: `ai-crawler`, `ai-user-fetch`, `search-engine`, `other-bot`, `http-library`, `browser`, and `unknown`.
 
 `GET` or `POST /api/echo` returns method, URL, query, Cloudflare country, colo, bot classification, and headers. `Cookie`, `Authorization`, `Proxy-Authorization`, `X-Api-Key`, `X-Auth-Token`, and connecting-IP headers are replaced with `[redacted]`. A request with `X-Api-Key: example-not-a-secret` came back `x-api-key` `[redacted]` and `cf-connecting-ip` `[redacted]`.
 
@@ -303,7 +327,7 @@ curl -sS https://botthru.com/api/uuid
 
 Streamable HTTP, JSON-RPC 2.0, no session, no SSE. Send JSON-RPC with `POST https://botthru.com/mcp`. `GET /mcp` returns a short JSON card (`transport` `streamable-http`, `sse` false, `method` `POST`). `DELETE /mcp` returns 405: `This server is stateless and has no session to delete.` `GET /mcp/sse` returns `sse_not_offered`. `notifications/initialized` returns 202 and an empty body. Protocol versions: `2025-03-26`, `2025-06-18`, `2025-11-25`. Official registry name: `com.botthru/drive-thru`. Server card: `https://botthru.com/.well-known/mcp/server-card.json`.
 
-`tools/list` returns 24 tools, in this order: `read_url`, `calculate`, `extract_page_data`, `site_discovery`, `check_url`, `check_mcp_server`, `check_http_security`, `scan_secrets`, `check_mcp_security`, `dns_lookup`, `rdap_lookup`, `time_convert`, `date_math`, `holidays`, `exchange_rate`, `weather`, `embed`, `rerank`, `fetch_page`, `ask`, `time`, `uuid`, `echo`, `whoami`.
+`tools/list` returns 25 tools, in this order: `read_url`, `calculate`, `extract_page_data`, `site_discovery`, `check_url`, `check_mcp_server`, `check_http_security`, `scan_secrets`, `check_mcp_security`, `audit_page`, `dns_lookup`, `rdap_lookup`, `time_convert`, `date_math`, `holidays`, `exchange_rate`, `weather`, `embed`, `rerank`, `fetch_page`, `ask`, `time`, `uuid`, `echo`, `whoami`.
 
 `?tools=read_url,calculate` limits `tools/list` and `tools/call` to those names. Unknown names are ignored. Each tool also has `https://botthru.com/mcp?tools={name}` (alias `/mcp/{name}`). Prompts advertised by the server: `audit_site_for_agents` and `read_page`. Call `prompts/list` for their arguments.
 
