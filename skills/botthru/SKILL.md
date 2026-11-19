@@ -3,9 +3,9 @@ name: botthru
 description: >-
   Use when you need to read a web page as markdown, check DNS/WHOIS/RDAP,
   convert time zones or currencies, do date math, get weather or holidays,
-  grade a live page for security headers, SEO, and agent-readiness, scan text
-  for leaked API keys, or audit an MCP server, without installing anything or
-  needing an API key.
+  grade a live page for security headers, SEO, agent-readiness, or lab page
+  speed, scan text for leaked API keys, or audit an MCP server, without
+  installing anything or needing an API key.
 license: MIT
 compatibility: HTTPS access to https://botthru.com. No API key.
 metadata:
@@ -16,7 +16,7 @@ metadata:
 
 # BotThru
 
-BotThru is a free toolbox for agents at `https://botthru.com` (version 0.2.0). No signup and no API key. The same 25 tools are available over REST, MCP (Streamable HTTP at `https://botthru.com/mcp`), and A2A (`message/send` at `https://botthru.com/a2a`). English. United States first.
+BotThru is a free toolbox for agents at `https://botthru.com` (version 0.2.0). No signup and no API key. The same 26 tools are available over REST, MCP (Streamable HTTP at `https://botthru.com/mcp`), and A2A (`message/send` at `https://botthru.com/a2a`). English. United States first.
 
 Call the tool you already know. Use `POST /v1/ask` only when the request is still a sentence. A direct call does the work; an ask is stored text plus a tool route.
 
@@ -32,6 +32,7 @@ Use BotThru to:
 - Convert fiat currencies (`exchange_rate`). No crypto.
 - Get current weather and a short forecast (`weather`).
 - Grade one live page A–F for security headers, SEO meta, and agent-readiness, and list the top fixes (`audit_page`).
+- Grade lab page speed for one public URL (`page_speed`): TTFB, HTML size, cache, and render-blocking tags. Not Core Web Vitals field data.
 - Grade security headers (`check_http_security`), scan text or one public script for leaked credentials (`scan_secrets`), or review a remote MCP server (`check_mcp_server`, `check_mcp_security`). Those MCP checks run `initialize` and `tools/list` and do not call the remote tools.
 - Embed or rerank short text (`embed`, `rerank`).
 - Mint a UUID, echo this request, or see how BotThru classifies the caller (`uuid`, `echo`, `whoami`).
@@ -52,6 +53,40 @@ Prefer a GET shortcut. It returns plain text. Send `Accept: application/json` fo
 | `GET /weather/{place}` | `weather`. Optional `days` (1–7, default 3) and `units` (`metric` or `imperial`). |
 | `GET /sec/{url}` | `check_http_security` |
 | `GET /audit/{url}` | `audit_page`. One grade for security headers, SEO meta, and agent-readiness, plus the top fixes. |
+| `GET /speed/{url}` | `page_speed`. Lab A–F speed estimate from one server fetch. Not Core Web Vitals field data. |
+
+## Catalog
+
+`tools/list` returns these 26 tools, in this order. The use line is the live catalog. Each example is one real call. Named arguments are that tool's input fields.
+
+| Tool | Use when | Example |
+| --- | --- | --- |
+| `read_url` | a page must be read as clean text | `GET /r/https://example.com` |
+| `calculate` | exact math or unit conversion | `GET /calc/15%25%20of%2080` |
+| `extract_page_data` | page metadata, links, or tables | `GET /v1/tools/extract_page_data?url=https://example.com&include=meta,headings` |
+| `site_discovery` | robots.txt, llms.txt, or agent files | `GET /v1/tools/site_discovery?domain_or_url=example.com` |
+| `check_url` | is a URL up | `GET /v1/tools/check_url?url=https://example.com` |
+| `check_mcp_server` | find an MCP endpoint | `GET /v1/tools/check_mcp_server?url=https://botthru.com/mcp` |
+| `check_http_security` | grade security headers | `GET /sec/https://example.com` |
+| `scan_secrets` | leaked credentials | `GET /v1/tools/scan_secrets?url=https://example.com` |
+| `check_mcp_security` | is an MCP server safe | `GET /v1/tools/check_mcp_security?url=https://botthru.com/mcp` |
+| `audit_page` | a site's security and agent-readiness | `GET /audit/https://example.com` |
+| `page_speed` | lab page speed | `GET /speed/https://example.com` |
+| `dns_lookup` | DNS or email auth | `GET /dns/example.com/MX` |
+| `rdap_lookup` | domain registration | `GET /v1/tools/rdap_lookup?domain=example.com` |
+| `time_convert` | a time in another zone | `GET /v1/tools/time_convert?time=2026-11-17T15:00&from_tz=America/New_York&to_tz=Europe/Paris` |
+| `date_math` | dates or business days | `GET /v1/tools/date_math?date=2026-11-17&add_business_days=3` |
+| `holidays` | public holidays | `GET /v1/tools/holidays?country_code=US&year=2026` |
+| `exchange_rate` | fiat FX | `GET /fx/USD/BRL/100` |
+| `weather` | weather | `GET /weather/Paris?days=1` |
+| `embed` | embed text | `POST /v1/tools/embed` `{"texts":["hello"]}` |
+| `rerank` | rerank documents | `POST /v1/tools/rerank` `{"query":"docs","documents":["a","b"]}` |
+| `fetch_page` | the same clean-text read as read_url | `GET /v1/tools/fetch_page?url=https://example.com` |
+| `ask` | a sentence, answered only when a tool ran | `POST /v1/ask` `{"need":"what time is it in Chicago"}` |
+| `time` | the current time | `GET /v1/tools/time?timezone=America/Sao_Paulo` |
+| `uuid` | a random id | `GET /api/uuid` |
+| `echo` | this request's headers | `GET /api/echo` |
+| `whoami` | which bot is calling | `GET /api/whoami` |
 
 Every catalog tool also runs at `GET /v1/tools/{name}` with arguments as query parameters, or `POST /v1/tools/{name}` with a JSON body. That wrapper is `{"ok":true,"tool":"{name}","result":{...}}`. Shortcut JSON is the inner result, with no `tool` field.
 
@@ -220,6 +255,18 @@ For `https://example.com` the result was `grade` `F`, `score` `0`, and `verdict`
 
 `GET /audit/https://example.com` returns the same grade as plain text (verdict, section grades, fixes). `Accept: application/json` on that shortcut is the inner result, with no `tool` field.
 
+### Page speed
+
+`page_speed` is a lab A–F estimate from one server-side fetch. It reports TTFB, fetch time, HTML size, cache headers, the redirect chain, render-blocking scripts and stylesheets, and the top fixes. It does not call Google, and it is not Core Web Vitals field data. The only input field is `url`.
+
+```bash
+curl -sS "https://botthru.com/speed/https://example.com"
+```
+
+Captured 2026-11-19 for `https://example.com`: `grade` `B`, `score` `89`, `lab_estimate` true, `field_data` false, `applied.url` `https://example.com`. The summary started `Grade B (89/100). No Cache-Control header.` Fixes included `cache-control` and `etag`. TTFB and the score change on the next fetch.
+
+`GET /speed/https://example.com` is plain text. `Accept: application/json` on that shortcut is the inner result. `GET /v1/tools/page_speed?url=https://example.com` wraps it with `tool`.
+
 ### Scan for leaked secrets
 
 Paste text (up to 200,000 characters) or one public URL. Send `text` or `url`, not both. Matches are redacted to the first 4 and last 2 characters. The text and the match are not stored.
@@ -327,11 +374,18 @@ curl -sS https://botthru.com/api/uuid
 
 Streamable HTTP, JSON-RPC 2.0, no session, no SSE. Send JSON-RPC with `POST https://botthru.com/mcp`. `GET /mcp` returns a short JSON card (`transport` `streamable-http`, `sse` false, `method` `POST`). `DELETE /mcp` returns 405: `This server is stateless and has no session to delete.` `GET /mcp/sse` returns `sse_not_offered`. `notifications/initialized` returns 202 and an empty body. Protocol versions: `2025-03-26`, `2025-06-18`, `2025-11-25`. Official registry name: `com.botthru/drive-thru`. Server card: `https://botthru.com/.well-known/mcp/server-card.json`.
 
-`tools/list` returns 25 tools, in this order: `read_url`, `calculate`, `extract_page_data`, `site_discovery`, `check_url`, `check_mcp_server`, `check_http_security`, `scan_secrets`, `check_mcp_security`, `audit_page`, `dns_lookup`, `rdap_lookup`, `time_convert`, `date_math`, `holidays`, `exchange_rate`, `weather`, `embed`, `rerank`, `fetch_page`, `ask`, `time`, `uuid`, `echo`, `whoami`.
+`tools/list` returns 26 tools, in this order: `read_url`, `calculate`, `extract_page_data`, `site_discovery`, `check_url`, `check_mcp_server`, `check_http_security`, `scan_secrets`, `check_mcp_security`, `audit_page`, `page_speed`, `dns_lookup`, `rdap_lookup`, `time_convert`, `date_math`, `holidays`, `exchange_rate`, `weather`, `embed`, `rerank`, `fetch_page`, `ask`, `time`, `uuid`, `echo`, `whoami`.
 
 `?tools=read_url,calculate` limits `tools/list` and `tools/call` to those names. Unknown names are ignored. Each tool also has `https://botthru.com/mcp?tools={name}` (alias `/mcp/{name}`). Prompts advertised by the server: `audit_site_for_agents` and `read_page`. Call `prompts/list` for their arguments.
 
-Add the server:
+Claude Code can install this skill and the server together. The marketplace name is `botthru-marketplace`. In Claude Code:
+
+```
+/plugin marketplace add rapharomie/botthru-skill
+/plugin install botthru@botthru-marketplace
+```
+
+The bundled server is HTTP at `https://botthru.com/mcp`, with no headers. To add only the server:
 
 ```bash
 claude mcp add --transport http botthru https://botthru.com/mcp
@@ -386,4 +440,4 @@ BotThru logs a salted hash of the network address, the user agent, the path, the
 
 `echo` redacts cookie, authorization, and connecting-IP headers to `[redacted]`.
 
-Questions: hello@botthru.com. Security contact is the same address, in `https://botthru.com/.well-known/security.txt`.
+Questions: hello@botthru.com. Privacy: `https://botthru.com/privacy`. Security contact is the same address, in `https://botthru.com/.well-known/security.txt`.

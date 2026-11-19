@@ -1,0 +1,14 @@
+{
+  "name": "botthru",
+  "description": "Free keyless toolbox. Installs the BotThru remote MCP server and the skill that says when to call each tool.",
+  "author": {
+    "name": "BotThru",
+    "email": "hello@botthru.com",
+    "url": "https://botthru.com"
+  },
+  "homepage": "https://botthru.com",
+  "repository": "https://github.com/rapharomie/botthru-skill",
+  "privacyPolicyUrl": "https://botthru.com/privacy",
+  "license": "MIT",
+  "keywords": ["mcp", "botthru", "web", "dns", "security"]
+}

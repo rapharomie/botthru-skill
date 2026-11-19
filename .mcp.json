@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "botthru": {
+      "type": "http",
+      "url": "https://botthru.com/mcp"
+    }
+  }
+}

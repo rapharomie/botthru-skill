@@ -1,0 +1,25 @@
+{
+  "name": "botthru-marketplace",
+  "description": "BotThru plugin: the remote MCP toolbox and the agent skill.",
+  "owner": {
+    "name": "BotThru",
+    "email": "hello@botthru.com",
+    "url": "https://botthru.com"
+  },
+  "plugins": [
+    {
+      "name": "botthru",
+      "source": "./",
+      "description": "Free keyless remote MCP toolbox and the BotThru skill.",
+      "author": {
+        "name": "BotThru",
+        "email": "hello@botthru.com",
+        "url": "https://botthru.com"
+      },
+      "homepage": "https://botthru.com",
+      "repository": "https://github.com/rapharomie/botthru-skill",
+      "license": "MIT",
+      "keywords": ["mcp", "botthru", "web", "dns", "security"]
+    }
+  ]
+}
